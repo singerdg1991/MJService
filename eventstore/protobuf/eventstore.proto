@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package protobuf;
+
+option go_package = "github.com/hoitek/Maja-Service;protobuf";
+
+message Event {
+  string event_id = 1;
+  string exchange_name = 2;
+  string aggregate_id = 3;
+  string aggregate_type = 4;
+  int64 version = 5;
+  string data = 6;
+  repeated string queueNames = 7;
+}
+
+message EventRequest {
+  Event eventEntry = 1;
+}
+
+message EventResponse {
+  string result = 1;
+}
+
+service EventService {
+  rpc SendEvent(EventRequest) returns (EventResponse);
+}

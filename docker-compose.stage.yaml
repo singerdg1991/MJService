@@ -1,0 +1,93 @@
+version: '3.7'
+
+services:
+
+  stage_maja_db:
+    container_name: stage_maja_db
+    image: postgres:14.4-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DATABASE_DEFAULT_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: trust
+      PGDATA: /var/lib/postgresql/data
+    expose:
+      - "5432"
+    volumes:
+      - ./scripts/database/postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
+      - stage_majadb_data:/var/lib/postgresql/data
+    command: ["postgres"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      hoitekBridge:
+
+  stage_maja_mongodb:
+    image: mongo:4.4
+    restart: unless-stopped
+    container_name: stage_maja_mongodb
+    env_file: .env
+    expose:
+      - "${DATABASE_MONGODB_PORT}"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 111111
+      MONGO_INITDB_DATABASE: majadb
+    volumes:
+      - stage_maja_mongodb_data:/data/db
+    networks:
+      hoitekBridge:
+
+  stage_maja_rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: stage_maja_rabbitmq
+    expose:
+      - "${RABBITMQ_PORT}"
+    ports:
+      - "${RABBITMQ_PANEL_PORT}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_logs:/var/log/rabbitmq
+    restart: unless-stopped
+    networks:
+      hoitekBridge:
+
+  stage_maja_service:
+    environment:
+      # go private
+      - GOPRIVATE=gitlab.hoitek.fi,github.com/hoitek/*
+    container_name: stage_maja_service
+    image: stage_maja_service
+    expose:
+      - "80"
+    depends_on:
+      stage_maja_db:
+        condition: service_healthy
+      stage_maja_rabbitmq:
+        condition: service_started
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:80/healthcheck" ]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    networks:
+      hoitekBridge:
+    restart: unless-stopped
+
+volumes:
+  stage_majadb_data:
+  stage_maja_mongodb_data:
+  rabbitmq_data:
+  rabbitmq_logs:
+
+networks:
+  hoitekBridge:
+    external: true

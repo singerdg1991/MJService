@@ -1,0 +1,104 @@
+version: '3.7'
+
+services:
+
+  test_cloud_test_maja_db:
+    profiles:
+      - db
+    container_name: test_cloud_test_maja_db
+    image: postgres:14.4-alpine
+    restart: unless-stopped
+    env_file: .env.test
+    environment:
+      POSTGRES_DB: ${DATABASE_DEFAULT_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: trust
+      PGDATA: /var/lib/postgresql/data
+    expose:
+      - "5432"
+    volumes:
+      - "$PWD/scripts/database/postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh"
+      - test_cloud_testmajadbdata:/var/lib/postgresql/data
+    command: >
+      postgres && bash -c "/docker-entrypoint-initdb.d/postgres-init.sh"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      hoitekBridge:
+
+  test_cloud_test_maja_service:
+    profiles:
+      - cloud
+    environment:
+      - GOPRIVATE=gitlab.hoitek.fi,github.com/hoitek/*
+    container_name: test_cloud_test_maja_service
+    env_file: .env.test
+    image: cloud_test_maja_service_test
+    working_dir: /app
+    expose:
+      - "9090"
+    command:
+      - 'dockerize'
+      - '-wait'
+      - 'tcp://test_cloud_test_maja_db:5432'
+      - '-timeout'
+      - '10s'
+      - './scripts/dev.sh'
+    volumes:
+      - .gitconfig:/root/.gitconfig
+      - .:/app
+    depends_on:
+      - test_cloud_test_maja_db
+    networks:
+      hoitekBridge:
+    restart: unless-stopped
+
+  test_maja_service_local:
+      profiles:
+        - local
+      environment:
+        - GOPRIVATE=gitlab.hoitek.fi,github.com/hoitek/*
+        - GOPROXY=https://goproxy.io,direct
+        - http_proxy=http://172.17.0.1:2081
+        - https_proxy=http://172.17.0.1:2081
+        - GIT_CURL_VERBOSE=1
+        - GIT_TRACE=1
+        - GIT_TRACE_PACKET=1
+        - GIT_TRACE_PERFORMANCE=1
+        - GIT_HTTP_MAX_REQUESTS=10
+        - GIT_TRACE_PACK_ACCESS=1
+        - GIT_BUFFER_LIMIT=500M
+      container_name: test_maja_service_local
+      build:
+        context: .
+        dockerfile: Dockerfile.test
+      env_file: .env.test
+      working_dir: /app
+      expose:
+        - "9090"
+      command:
+        - 'dockerize'
+        - '-wait'
+        - 'tcp://test_cloud_test_maja_db:5432'
+        - '-timeout'
+        - '10s'
+        - './scripts/dev.sh'
+      volumes:
+        - .gitconfig:/root/.gitconfig
+        - .:/app
+      depends_on:
+        - test_cloud_test_maja_db
+      networks:
+        hoitekBridge:
+      restart: unless-stopped
+
+volumes:
+  test_cloud_testmajadbdata:
+
+networks:
+  hoitekBridge:
+    external: true

@@ -1,0 +1,47 @@
+version: '3'
+
+dotenv: ['.env']
+method: timestamp
+interval: '1s'
+
+tasks:
+  linter:
+    summary: |
+      1) Lint Maja
+    cmds:
+      - ./bin/staticcheck ./...
+    sources:
+      - ./**/*.go
+      - ./**/*.mod
+      - ./**/*.conf
+      - ./**/*.env
+      - ./**/*.json
+      - ./**/*.proto
+  build:
+    summary: |
+      2) Build Maja
+    deps: [linter]
+    cmds:
+      - ./scripts/openapi.sh
+      - go build -o ./build/httpMaja ./cmd/http/*.go
+    sources:
+      - ./**/*.go
+      - ./**/*.mod
+      - ./**/*.conf
+      - ./**/*.env
+      - ./**/*.json
+      - ./**/*.proto
+  run:
+    summary: |
+      3) Run Maja
+    deps: [build]
+    cmds:
+      - defer: rm -rf .task
+      - ./build/httpMaja
+    sources:
+      - ./**/*.go
+      - ./**/*.mod
+      - ./**/*.conf
+      - ./**/*.env
+      - ./**/*.json
+      - ./**/*.proto

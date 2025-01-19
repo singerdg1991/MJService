@@ -1,0 +1,16 @@
+FROM golang:1.23.1
+
+CMD wget https://github.com/jwilder/dockerize/releases/download/v0.6.1/dockerize-linux-amd64-v0.6.1.tar.gz && \
+    tar -C /usr/local/bin -xzvf dockerize-linux-amd64-v0.6.1.tar.gz && \
+    rm dockerize-linux-amd64-v0.6.1.tar.gz
+
+WORKDIR /app
+
+ADD . .
+
+ENV GOOS linux
+ENV GOARCH amd64
+
+RUN cp -rf ./.gitconfig /root/.gitconfig
+RUN go mod tidy
+RUN go mod vendor
